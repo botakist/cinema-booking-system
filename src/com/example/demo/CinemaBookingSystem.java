@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import com.example.demo.validators.Validator;
 import com.example.demo.workflows.Workflows;
 
 public class CinemaBookingSystem {
@@ -7,7 +8,7 @@ public class CinemaBookingSystem {
         Workflows.initialiseSettings();
         while (true) {
             String optionSelected = Workflows.displayMainMenu();
-            int option = Workflows.isValidIntegerInput(optionSelected, 3);
+            int option = Validator.isValidIntegerInput(optionSelected, 3);
             if (option < 0) {
                 // repeat main menu printing due to invalid option entered.
                 continue;
@@ -19,9 +20,8 @@ public class CinemaBookingSystem {
             if (optionSelected.equals("1")) {
                 Workflows.ticketBookingFlow();
             }
-
             if (optionSelected.equals("2")) {
-//                Workflows.checkBookings();
+                Workflows.checkBookings();
             }
         }
     }

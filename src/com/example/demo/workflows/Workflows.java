@@ -3,14 +3,14 @@ package com.example.demo.workflows;
 import com.example.demo.constants.Constants;
 import com.example.demo.exception.NotEnoughSeatsAvailableException;
 import com.example.demo.map.CinemaMap;
+import com.example.demo.validators.Validator;
 
 import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.Scanner;
-import java.util.regex.Pattern;
 
 public class Workflows {
-    public static Map<String, Object> settings = new HashMap<>();
+    public static HashMap<String, Object> settings = new HashMap<>();
     public static Scanner scanner = new Scanner(System.in);
 
     public static String getMovieTitle() {
@@ -21,7 +21,7 @@ public class Workflows {
         return (int) settings.get(Constants.TOTAL_SEATS_AVAILABLE);
     }
 
-    public static int decreaseTotalSeatsAvailable(int amountToDecrease) {
+    public static int checkTotalSeatsAvailableAfterReservation(int amountToDecrease) {
         int amountLeft = getTotalSeatsAvailable() - amountToDecrease;
         if (amountLeft < 0) {
             throw new NotEnoughSeatsAvailableException(String.format("Sorry, there are only %d seats available.", getTotalSeatsAvailable()));
@@ -41,8 +41,8 @@ public class Workflows {
         settings.put(Constants.ID, getId() + 1);
     }
 
-    public static int getRow() {
-        return (int) settings.get(Constants.ROW);
+    public static int getRows() {
+        return (int) settings.get(Constants.ROWS);
     }
 
     public static int getSeatsPerRow() {
@@ -58,7 +58,7 @@ public class Workflows {
     }
 
     public static void setMaximumRowAllowed() {
-        char maxRowChar = Constants.ALPHABETS[getRow() - 1].charAt(0);
+        char maxRowChar = Constants.ALPHABETS[getRows() - 1].charAt(0);
         settings.put(Constants.MAXIMUM_ROW_ALLOWED, maxRowChar);
     }
 
@@ -82,12 +82,20 @@ public class Workflows {
         settings.put(Constants.MIDDLEMOST_COL, col);
     }
 
+    public static HashSet<String> getActiveBookingIds() {
+        return (HashSet<String>) settings.get(Constants.ACTIVE_BOOKING_IDS);
+    }
+
+    public static void addActiveBookingIds(String newBookingId) {
+        getActiveBookingIds().add(newBookingId);
+    }
+
     public static void initialiseSettings() {
         while (true) {
             System.out.println(Constants.DEFINE_TITLE_AND_SEATING_MAP);
             String userInput = scanner.nextLine();
             // clean up input
-            if (isBlank(userInput)) {
+            if (Validator.isBlank(userInput)) {
                 System.out.println("Invalid input. Input is not in [Title] [Row] [SeatsPerRow] format.");
                 continue;
             }
@@ -99,7 +107,7 @@ public class Workflows {
                 continue;
             }
 
-            int row = 0;
+            int rows = 0;
             int seatsPerRow = 0;
             try {
                 seatsPerRow = Integer.parseInt(parts[parts.length - 1]);
@@ -107,13 +115,13 @@ public class Workflows {
                 System.out.println("Invalid SeatsPerRow input. [SeatsPerRow] must be in number format.");
             }
             try {
-                row = Integer.parseInt(parts[parts.length - 2]);
+                rows = Integer.parseInt(parts[parts.length - 2]);
             } catch (NumberFormatException e) {
                 System.out.println("Invalid Row input. [Row] must be in number format.");
                 continue;
             }
 
-            if (row == 0 || row > 26) {
+            if (rows == 0 || rows > 26) {
                 System.out.println("Invalid Row input. [Row] must be between 1 and 26.");
                 continue;
             }
@@ -131,14 +139,24 @@ public class Workflows {
                 titleBuilder.append(parts[i]);
             }
             settings.put(Constants.TITLE, titleBuilder);
-            settings.put(Constants.ROW, row);
+            settings.put(Constants.ROWS, rows);
             settings.put(Constants.SEATS_PER_ROW, seatsPerRow);
-            settings.put(Constants.TOTAL_SEATS_AVAILABLE, row * seatsPerRow);
-            settings.put(Constants.CINEMA_MAP, new String[row][seatsPerRow]);
+            settings.put(Constants.TOTAL_SEATS_AVAILABLE, rows * seatsPerRow);
+            settings.put(Constants.CINEMA_MAP, new String[rows][seatsPerRow]);
             settings.put(Constants.ID, 1);
-            setMiddleMostCol(seatsPerRow / 2);
+            setMiddleMostCol(deriveMiddleMostCol(seatsPerRow));
             setMaximumRowAllowed();
+            settings.put(Constants.ACTIVE_BOOKING_IDS, new HashSet<String>());
+            CinemaMap.generateEmptyCinemaMap();
             break;
+        }
+    }
+
+    public static int deriveMiddleMostCol(int seatsPerRow) {
+        if (seatsPerRow % 2 == 0) {
+            return seatsPerRow / 2;
+        } else {
+            return (seatsPerRow / 2) + 1;
         }
     }
 
@@ -153,97 +171,58 @@ public class Workflows {
         return scanner.nextLine();
     }
 
-    public static int isValidIntegerInput(String userInput, int max) {
-        if (isBlank(userInput)) {
-            System.out.println("Invalid selection. Please select a valid option.");
-            return 0;
-        }
-        int input = 0;
-        try {
-            input = Integer.parseInt(userInput);
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid option selected. Please select a valid option.");
-            return 0;
-        }
-        if (input < 1) {
-            System.out.printf("%d is not a valid option. Please enter positive numbers only.%n", input);
-            return 0;
-        }
-        if (max == 0) {
-            // use a different validation message
-            return input;
-        }
-        if (input > max) {
-            System.out.printf("%d is not a valid option. Please select options between 1 and %d only.%n", input, max);
-            return 0;
-        }
-        return input;
-    }
-
-
     public static void ticketBookingFlow() {
         generateBookingId();
         while (true) {
             System.out.println("Enter number of tickets to book, or enter blank to go back to main menu:");
             String input = scanner.nextLine();
-            if (isBlank(input)) {
+            if (Validator.isBlank(input)) {
                 break;
             }
-            int tickets = isValidIntegerInput(input, 0);
-            if (tickets == 0) {
+            int noOfSeatsBooked = Validator.isValidIntegerInput(input, 0);
+            if (noOfSeatsBooked == 0) {
                 continue;
             }
             int seatsLeft = 0;
             try {
-                seatsLeft = decreaseTotalSeatsAvailable(tickets);
+                seatsLeft = checkTotalSeatsAvailableAfterReservation(noOfSeatsBooked);
             } catch (NotEnoughSeatsAvailableException e) {
                 System.out.println(e.getMessage());
                 continue;
             }
 
-            System.out.printf("Successfully reserved %d %s tickets.%n", tickets, getMovieTitle());
+            System.out.printf("Successfully reserved %d %s tickets.%n", noOfSeatsBooked, getMovieTitle());
             System.out.printf("Booking id: %s%n", getCurrentBookingId());
             System.out.println("Selected seats:");
-            CinemaMap.displayMapDefault();
-            System.out.println("Enter blank to accept seat selection, or enter a new seating position:");
-            System.out.print(Constants.POINT_RIGHT_WITH_SPACE);
-            String seatSelection = scanner.nextLine();
-            if (isBlank(seatSelection)) {
-                confirmation(seatsLeft);
-                break;
+            CinemaMap.setReservationForCurrentUser(noOfSeatsBooked, null);
+            while (true) {
+                CinemaMap.display(getCurrentBookingId());
+                System.out.println("Enter blank to accept seat selection, or enter a new seating position:");
+                System.out.print(Constants.POINT_RIGHT_WITH_SPACE);
+                String seatSelection = scanner.nextLine();
+                if (Validator.isBlank(seatSelection)) {
+                    updateSettings(seatsLeft);
+                    break;
+                }
+                if (!Validator.isValidSeatSelection(seatSelection, getMaximumRowAllowed(), getSeatsPerRow())) {
+                    continue;
+                }
+                if (seatTaken(seatSelection)) {
+                    System.out.printf("Seat %s has already been taken. Please select another seat.%n%n", seatSelection);
+                    continue;
+                }
+                CinemaMap.clearExistingReservationForBookingId(getCurrentBookingId());
+                CinemaMap.setReservationForCurrentUser(noOfSeatsBooked, seatSelection);
             }
-            if (!isValidSeatSelection(seatSelection)) {
-                continue;
-            }
-
-
-            System.out.println("Enter blank to accept seat selection, or enter a new seating position:");
-            System.out.print(Constants.POINT_RIGHT_WITH_SPACE);
-            String newSeatingPosition = scanner.nextLine();
             break;
         }
     }
 
-    public static boolean isValidSeatSelection(String seatSelection) {
-        char row = seatSelection.charAt(0);
-        if (row < 'A') {
-            // input row cannot be "smaller" than the first row ('A')
-            System.out.printf("Invalid seat selection %s row %c. Please enter a valid row.", seatSelection, row);
-            return false;
-        }
-        // input row cannot be larger than the initial row settings
-        if (row > getMaximumRowAllowed()) {
-            System.out.printf("Invalid seat selection %s row %c. Row input cannot exceed %c.%n", seatSelection, row, getMaximumRowAllowed());
-            return false;
-        }
-        // Trim any leading '0' characters
+    public static boolean seatTaken(String seatSelection) {
+        String[] row = (String[]) settings.get((String.valueOf(seatSelection.charAt(0))));
         String trimmedStr = seatSelection.substring(1).replaceFirst("^0+", "");
         int seatNumberInt = Integer.parseInt(trimmedStr);
-        if (seatNumberInt > getSeatsPerRow()) {
-            System.out.printf("Invalid seat selection %s seat number %d. Seat number cannot be more than the maximum allowed %d.%n", seatSelection, seatNumberInt, getSeatsPerRow());
-            return false;
-        }
-        return true;
+        return !Validator.isBlank(row[seatNumberInt - 1]);
     }
 
     public static String generateBookingId() {
@@ -262,16 +241,31 @@ public class Workflows {
         return sb.toString();
     }
 
-    public static boolean isBlank(String input) {
-        return input == null || input.isEmpty() || Pattern.matches("^\\s*$", input);
-    }
-
-    public static void confirmation(int amountLeft) {
+    public static void updateSettings(int amountLeft) {
         System.out.printf("Booking id: %s confirmed.%n", getCurrentBookingId());
+        // set active list of booking ids
+        addActiveBookingIds(getCurrentBookingId());
         // only set available seats left after booking confirmed.
         setTotalSeatsAvailable(amountLeft);
         // increment id only after booking confirmed
         increaseId();
+    }
+
+    public static void checkBookings() {
+        while (true) {
+            System.out.println("Enter booking id, or enter blank to go back to main menu:");
+            System.out.print(Constants.POINT_RIGHT_WITH_SPACE);
+            String input = scanner.nextLine();
+            if (Validator.isBlank(input)) {
+                break;
+            }
+            if (!Validator.isValidBookingId(input, getActiveBookingIds())) {
+                System.out.printf("Booking id %s does not exist. Please enter a valid booking id.%n%n", input);
+                continue;
+            }
+            CinemaMap.display(input);
+            System.out.println();
+        }
     }
 }
 

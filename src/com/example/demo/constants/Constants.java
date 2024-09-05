@@ -9,7 +9,7 @@ public class Constants {
     public static final String OPTION_THREE = "[3] Exit";
     public static final String PLS_ENTER_SELECTION = "Please enter your selection:";
     public static final String TITLE = "title";
-    public static final String ROW = "row";
+    public static final String ROWS = "rows";
     public static final String SEATS_PER_ROW = "seatsPerRow";
     public static final String TOTAL_SEATS_AVAILABLE = "totalSeatsAvailable";
     public static final String GIC = "GIC";
@@ -24,4 +24,5 @@ public class Constants {
     public static final String MAXIMUM_ROW_ALLOWED = "maximumRowAllowed";
     public static final String CINEMA_MAP = "cinemaMap";
     public static final String MIDDLEMOST_COL = "middleMostCol";
+    public static final String ACTIVE_BOOKING_IDS = "activeBookingIds";
 }
